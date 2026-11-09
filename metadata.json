@@ -1,0 +1,6 @@
+{
+  "name": "Netflix Glass Experience",
+  "description": "Futuristic OLED Glass UI recreation of Netflix featuring immersive ambient living room display, trailers, watchlist, and interactive playback.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
