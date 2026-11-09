@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   ALL_HISTORICAL_BOOKS,
   BESTSELLER_HISTORICAL_BOOKS,
@@ -21,6 +21,7 @@ import { BestsellersRow } from './components/BestsellersRow.tsx';
 import { ContinueReadingRow } from './components/ContinueReadingRow.tsx';
 import { BookReaderModal } from './components/BookReaderModal.tsx';
 import { BookDetailsModal } from './components/BookDetailsModal.tsx';
+import { DossierCard } from './components/DossierCard.tsx';
 import { playClickSound, playNetflixTaDum } from './utils/audio.ts';
 import {
   Sparkles,
@@ -52,8 +53,37 @@ export default function App() {
   ]);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('netflix_sidebar_expanded');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
 
-  const ITEMS_PER_PAGE = 24;
+  const toggleSidebar = () => {
+    setIsSidebarExpanded((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('netflix_sidebar_expanded', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const ITEMS_PER_PAGE = 16;
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -137,13 +167,17 @@ export default function App() {
         }}
         onNotificationClick={() => showToast('200 dossiers historiques sont disponibles dans votre bibliothèque')}
         unreadCount={3}
+        isSidebarExpanded={isSidebarExpanded}
+        onToggleSidebar={toggleSidebar}
       />
 
-      {/* True Full Screen Split View: Left Dock + Sidebar + Main Scrollable Canvas */}
+      {/* True Full Screen Split View: Left Dock + Collapsible Sidebar + Main Scrollable Canvas */}
       <div className="relative z-10 flex-1 flex flex-row w-full h-[calc(100vh-53px)] overflow-hidden">
-        {/* Left Quick Navigation Dock (Flush on the left edge, no floating margin) */}
+        {/* Left Quick Navigation Dock (Flush on the left edge, with expand/collapse toggle) */}
         <LeftDock
           activeTab={activeDockTab}
+          isSidebarExpanded={isSidebarExpanded}
+          onToggleSidebar={toggleSidebar}
           onSelectTab={(tab) => {
             setActiveDockTab(tab);
             if (tab === 'browse') setActiveNav('browse');
@@ -160,25 +194,92 @@ export default function App() {
           }}
         />
 
-        {/* Sidebar: Navigation & Dossiers Clés */}
-        <div className="w-56 lg:w-60 h-full p-4 border-r border-white/8 bg-[#121317]/95 flex flex-col justify-between shrink-0 overflow-y-auto">
-          <Sidebar
-            activeNav={activeNav}
-            onSelectNav={(nav) => setActiveNav(nav as 'browse' | 'wishlist' | 'coming_soon')}
-            spotlightBooks={spotlightBooks}
-            onOpenReader={(book) => setReadingBook(book)}
-            wishlistCount={wishlist.length}
-            totalBooksCount={ALL_HISTORICAL_BOOKS.length}
-          />
+        {/* Collapsible Sidebar: Navigation & Dossiers Clés ("dépliable / repliable") */}
+        <div
+          className={`h-full border-r border-white/8 bg-[#121317]/95 flex flex-col justify-between shrink-0 overflow-hidden transition-all duration-300 ease-in-out ${
+            isSidebarExpanded
+              ? 'w-56 lg:w-60 p-4 opacity-100'
+              : 'w-0 p-0 border-r-0 opacity-0 pointer-events-none'
+          }`}
+        >
+          <div className="w-56 lg:w-60 h-full flex flex-col justify-between overflow-y-auto pr-1">
+            <Sidebar
+              activeNav={activeNav}
+              onSelectNav={(nav) => setActiveNav(nav as 'browse' | 'wishlist' | 'coming_soon')}
+              spotlightBooks={spotlightBooks}
+              onOpenReader={(book) => setReadingBook(book)}
+              wishlistCount={wishlist.length}
+              totalBooksCount={ALL_HISTORICAL_BOOKS.length}
+              onToggleCollapse={toggleSidebar}
+            />
+          </div>
         </div>
 
         {/* Main Content Area (Edge-to-Edge Full Screen Scrolling) */}
         <main className="flex-1 min-w-0 h-full overflow-y-auto p-4 sm:p-6 bg-[#0f1013]/60">
           {activeNav === 'browse' ? (
             <>
+              {/* Category & Display Mode Control Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pb-3 border-b border-white/8">
+                {/* Region filter tabs */}
+                <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
+                  {categories.map((cat) => {
+                    const isActive = categoryFilter === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          playClickSound();
+                          setCategoryFilter(cat.id as typeof categoryFilter);
+                          setCurrentPage(1);
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                          isActive
+                            ? 'bg-white text-zinc-950 shadow-md'
+                            : 'bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/5'
+                        }`}
+                      >
+                        {cat.label} ({cat.count})
+                      </button>
+                    );
+                  })}
+                </div>
 
-
-              {/* Search feedback notice */}
+                {/* Display mode buttons (À la une vs Grille complète) */}
+                <div className="flex items-center gap-1 bg-white/5 p-1 rounded-full border border-white/8 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playClickSound();
+                      setDisplayMode('rows');
+                      setCategoryFilter('all');
+                      setPartFilter('all');
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                      displayMode === 'rows' && categoryFilter === 'all'
+                        ? 'bg-[#E50914] text-white shadow'
+                        : 'text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    À la une
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playClickSound();
+                      setDisplayMode('grid');
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                      displayMode === 'grid' || categoryFilter !== 'all'
+                        ? 'bg-[#E50914] text-white shadow'
+                        : 'text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    Grille ({filteredCatalog.length})
+                  </button>
+                </div>
+              </div>
               {searchQuery && (
                 <div className="mb-4 px-3 py-2 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs text-zinc-300">
                   <span>
@@ -203,6 +304,7 @@ export default function App() {
                     onRead={(book) => setReadingBook(book)}
                     isInWishlist={wishlist.includes(heroBook.id)}
                     onToggleWishlist={toggleWishlist}
+                    onSelectHero={(book) => setHeroBook(book)}
                   />
 
                   {/* Row 1: Grands Événements & Bestsellers */}
@@ -210,6 +312,8 @@ export default function App() {
                     items={BESTSELLER_HISTORICAL_BOOKS}
                     onOpenReader={(book) => setReadingBook(book)}
                     onOpenDetails={(book) => setDetailsBook(book)}
+                    wishlist={wishlist}
+                    onToggleWishlist={toggleWishlist}
                   />
 
                   {/* Row 2: Reprendre l'étude et la lecture */}
@@ -217,14 +321,24 @@ export default function App() {
                     items={CONTINUE_HISTORICAL_BOOKS}
                     onOpenReader={(book) => setReadingBook(book)}
                     onOpenDetails={(book) => setDetailsBook(book)}
+                    wishlist={wishlist}
+                    onToggleWishlist={toggleWishlist}
                   />
 
                   {/* Row 3: Afrique (Sélection de 4 dossiers majeurs) */}
-                  <section className="mb-5 select-none">
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-white text-xs lg:text-sm font-semibold tracking-wide flex items-center gap-2">
-                        <span>Afrique : Royaumes, Colonisation & Indépendances (40 dossiers)</span>
-                      </h2>
+                  <section className="mb-8 select-none">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h2 className="text-white text-base lg:text-lg font-bold tracking-tight flex items-center gap-2">
+                          <span>Afrique : Royaumes, Empires & Indépendances</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">
+                            40 dossiers
+                          </span>
+                        </h2>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          Des épopées mandingues et aksoumites jusqu'aux luttes de libération
+                        </p>
+                      </div>
                       <button
                         onClick={() => {
                           setCategoryFilter('afrique');
@@ -235,65 +349,35 @@ export default function App() {
                         Voir les 40 dossiers →
                       </button>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
                       {AFRICA_BOOKS.slice(0, 4).map((book) => (
-                        <div
+                        <DossierCard
                           key={book.id}
-                          onClick={() => {
-                            playNetflixTaDum();
-                            setReadingBook(book);
-                          }}
-                          className="group relative rounded-xl overflow-hidden bg-[#131417] border border-white/8 hover:border-white/25 transition-all duration-200 hover:scale-[1.03] hover:shadow-2xl hover:shadow-black/70 cursor-pointer flex flex-col justify-between"
-                        >
-                          <div className="relative w-full h-[105px] lg:h-[120px] overflow-hidden bg-black">
-                            <img
-                              src={book.coverImage}
-                              alt={book.title}
-                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-106"
-                              loading="lazy"
-                            />
-                            <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/70 backdrop-blur-xs text-[10px] text-amber-400 font-bold flex items-center gap-1 border border-white/10">
-                              <Star className="w-2.5 h-2.5 fill-amber-400" />
-                              <span>{book.rating}</span>
-                            </div>
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <div className="w-8 h-8 rounded-full bg-[#E50914] text-white flex items-center justify-center shadow-lg">
-                                <BookOpen className="w-4 h-4 fill-white" />
-                              </div>
-                            </div>
-                          </div>
-                          <div className="p-2.5 flex items-start justify-between gap-1.5 bg-[#0e0f11]">
-                            <div className="min-w-0 flex-1">
-                              <h3 className="text-white text-xs font-bold truncate group-hover:text-red-400 transition-colors">
-                                {book.title}
-                              </h3>
-                              <p className="text-zinc-400 text-[10px] mt-0.5 truncate font-medium">
-                                {book.author}
-                              </p>
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                playClickSound();
-                                setDetailsBook(book);
-                              }}
-                              className="text-zinc-400 hover:text-white p-1 rounded hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
-                              title="Fiche détaillée"
-                            >
-                              <Info className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
+                          book={book}
+                          onOpenReader={(b) => setReadingBook(b)}
+                          onOpenDetails={(b) => setDetailsBook(b)}
+                          isInWishlist={wishlist.includes(book.id)}
+                          onToggleWishlist={toggleWishlist}
+                          actionLabel="Lire le dossier"
+                        />
                       ))}
                     </div>
                   </section>
 
                   {/* Row 4: Europe (Sélection de 4 dossiers majeurs) */}
-                  <section className="mb-5 select-none">
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-white text-xs lg:text-sm font-semibold tracking-wide flex items-center gap-2">
-                        <span>Europe : Révolutions, Empires & Guerres (40 dossiers)</span>
-                      </h2>
+                  <section className="mb-8 select-none">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h2 className="text-white text-base lg:text-lg font-bold tracking-tight flex items-center gap-2">
+                          <span>Europe : Révolutions, Siècle des Lumières & Traités</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 font-semibold">
+                            40 dossiers
+                          </span>
+                        </h2>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          De la démocratie athénienne à la chute du rideau de fer
+                        </p>
+                      </div>
                       <button
                         onClick={() => {
                           setCategoryFilter('europe');
@@ -304,55 +388,17 @@ export default function App() {
                         Voir les 40 dossiers →
                       </button>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
                       {EUROPE_BOOKS.slice(0, 4).map((book) => (
-                        <div
+                        <DossierCard
                           key={book.id}
-                          onClick={() => {
-                            playNetflixTaDum();
-                            setReadingBook(book);
-                          }}
-                          className="group relative rounded-xl overflow-hidden bg-[#131417] border border-white/8 hover:border-white/25 transition-all duration-200 hover:scale-[1.03] hover:shadow-2xl hover:shadow-black/70 cursor-pointer flex flex-col justify-between"
-                        >
-                          <div className="relative w-full h-[105px] lg:h-[120px] overflow-hidden bg-black">
-                            <img
-                              src={book.coverImage}
-                              alt={book.title}
-                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-106"
-                              loading="lazy"
-                            />
-                            <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/70 backdrop-blur-xs text-[10px] text-amber-400 font-bold flex items-center gap-1 border border-white/10">
-                              <Star className="w-2.5 h-2.5 fill-amber-400" />
-                              <span>{book.rating}</span>
-                            </div>
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <div className="w-8 h-8 rounded-full bg-[#E50914] text-white flex items-center justify-center shadow-lg">
-                                <BookOpen className="w-4 h-4 fill-white" />
-                              </div>
-                            </div>
-                          </div>
-                          <div className="p-2.5 flex items-start justify-between gap-1.5 bg-[#0e0f11]">
-                            <div className="min-w-0 flex-1">
-                              <h3 className="text-white text-xs font-bold truncate group-hover:text-red-400 transition-colors">
-                                {book.title}
-                              </h3>
-                              <p className="text-zinc-400 text-[10px] mt-0.5 truncate font-medium">
-                                {book.author}
-                              </p>
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                playClickSound();
-                                setDetailsBook(book);
-                              }}
-                              className="text-zinc-400 hover:text-white p-1 rounded hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
-                              title="Fiche détaillée"
-                            >
-                              <Info className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
+                          book={book}
+                          onOpenReader={(b) => setReadingBook(b)}
+                          onOpenDetails={(b) => setDetailsBook(b)}
+                          isInWishlist={wishlist.includes(book.id)}
+                          onToggleWishlist={toggleWishlist}
+                          actionLabel="Lire le dossier"
+                        />
                       ))}
                     </div>
                   </section>
@@ -389,68 +435,17 @@ export default function App() {
                   </div>
 
                   {/* Book Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                     {paginatedGridBooks.map((book) => (
-                      <div
+                      <DossierCard
                         key={book.id}
-                        onClick={() => {
-                          playNetflixTaDum();
-                          setReadingBook(book);
-                        }}
-                        className="group relative rounded-xl overflow-hidden bg-[#131417] border border-white/10 hover:border-white/30 transition-all duration-200 hover:scale-[1.03] hover:shadow-2xl hover:shadow-black/70 cursor-pointer flex flex-col justify-between"
-                      >
-                        <div className="relative w-full h-40 overflow-hidden bg-black">
-                          <img
-                            src={book.coverImage}
-                            alt={book.title}
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-106"
-                            loading="lazy"
-                          />
-                          <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/70 backdrop-blur-xs text-[9px] text-amber-400 font-bold flex items-center gap-0.5 border border-white/10">
-                            <Star className="w-2.5 h-2.5 fill-amber-400" />
-                            <span>{book.rating}</span>
-                          </div>
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <div className="w-8 h-8 rounded-full bg-[#E50914] text-white flex items-center justify-center shadow-lg">
-                              <BookOpen className="w-4 h-4 fill-white" />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="p-2.5 flex flex-col justify-between flex-1 bg-[#0e0f11]">
-                          <div>
-                            <h3 className="text-white text-xs font-bold line-clamp-2 group-hover:text-red-400 transition-colors leading-snug">
-                              {book.title}
-                            </h3>
-                            <p className="text-zinc-400 text-[10px] mt-1 truncate">
-                              {book.author}
-                            </p>
-                          </div>
-
-                          <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                playClickSound();
-                                setDetailsBook(book);
-                              }}
-                              className="text-[10px] text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer"
-                            >
-                              <Info className="w-3 h-3" />
-                              <span>Détails</span>
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleWishlist(book);
-                              }}
-                              className="text-[10px] text-red-500 hover:text-red-400 font-medium cursor-pointer"
-                            >
-                              {wishlist.includes(book.id) ? '✓ Sauvé' : '+ Liste'}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                        book={book}
+                        onOpenReader={(b) => setReadingBook(b)}
+                        onOpenDetails={(b) => setDetailsBook(b)}
+                        isInWishlist={wishlist.includes(book.id)}
+                        onToggleWishlist={toggleWishlist}
+                        actionLabel="Lire le dossier"
+                      />
                     ))}
                   </div>
 
@@ -512,37 +507,17 @@ export default function App() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                   {wishlistBooks.map((book) => (
-                    <div
+                    <DossierCard
                       key={book.id}
-                      onClick={() => setReadingBook(book)}
-                      className="group relative rounded-xl overflow-hidden bg-zinc-900/90 border border-white/10 hover:border-white/30 transition-all cursor-pointer p-2.5 flex flex-col justify-between"
-                    >
-                      <div className="h-40 rounded-lg overflow-hidden bg-black mb-2 shadow">
-                        <img
-                          src={book.coverImage}
-                          alt={book.title}
-                          className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                        />
-                      </div>
-                      <div>
-                        <h3 className="text-xs font-bold text-white truncate">{book.title}</h3>
-                        <p className="text-[10px] text-zinc-400 truncate mt-0.5">{book.author}</p>
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
-                          <span className="text-[9px] text-zinc-500">{book.year}</span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleWishlist(book);
-                            }}
-                            className="text-red-500 text-[10px] hover:text-red-400 font-semibold cursor-pointer"
-                          >
-                            Retirer
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                      book={book}
+                      onOpenReader={(b) => setReadingBook(b)}
+                      onOpenDetails={(b) => setDetailsBook(b)}
+                      isInWishlist={true}
+                      onToggleWishlist={toggleWishlist}
+                      actionLabel="Lire le dossier"
+                    />
                   ))}
                 </div>
               )}
@@ -567,40 +542,17 @@ export default function App() {
                 Découvrez une sélection des fiches de la Partie 2 prêtes pour l'étude et l'enrichissement personnalisé.
               </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {ALL_HISTORICAL_BOOKS.slice(100, 106).map((book) => (
-                  <div
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                {ALL_HISTORICAL_BOOKS.slice(100, 108).map((book) => (
+                  <DossierCard
                     key={book.id}
-                    onClick={() => setReadingBook(book)}
-                    className="rounded-xl overflow-hidden bg-zinc-900/90 border border-white/10 p-3.5 hover:border-white/30 transition cursor-pointer flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="h-44 rounded-lg overflow-hidden bg-black mb-3 shadow">
-                        <img
-                          src={book.coverImage}
-                          alt={book.title}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <span className="text-[10px] uppercase font-bold text-red-500 tracking-wider">
-                        {book.genre}
-                      </span>
-                      <h3 className="text-sm font-bold text-white mt-0.5 line-clamp-1">{book.title}</h3>
-                      <p className="text-xs text-zinc-300">{book.author}</p>
-                      <p className="text-xs text-zinc-400 mt-2 line-clamp-2 leading-relaxed">
-                        {book.description}
-                      </p>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setReadingBook(book);
-                      }}
-                      className="mt-3.5 w-full py-2 rounded-lg bg-white/10 hover:bg-[#E50914] text-xs font-semibold text-white transition-colors cursor-pointer"
-                    >
-                      Consulter la fiche
-                    </button>
-                  </div>
+                    book={book}
+                    onOpenReader={(b) => setReadingBook(b)}
+                    onOpenDetails={(b) => setDetailsBook(b)}
+                    isInWishlist={wishlist.includes(book.id)}
+                    onToggleWishlist={toggleWishlist}
+                    actionLabel="Consulter"
+                  />
                 ))}
               </div>
             </div>

@@ -1,4 +1,4 @@
-import { BookItem } from '../data/booksData.ts';
+import type { BookItem } from '../data/booksData.ts';
 
 export function filterBooksByQuery(items: BookItem[], query: string): BookItem[] {
   if (!query || query.trim() === '') return items;

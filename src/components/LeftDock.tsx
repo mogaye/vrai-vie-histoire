@@ -1,17 +1,21 @@
 import React from 'react';
-import { BookOpen, Library, Bookmark, Headphones, Home, Search } from 'lucide-react';
+import { BookOpen, Library, Bookmark, Headphones, Home, Search, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
 import { playClickSound } from '../utils/audio.ts';
 
 interface LeftDockProps {
   activeTab: string;
   onSelectTab: (tab: string) => void;
   onOpenSearch: () => void;
+  isSidebarExpanded?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export const LeftDock: React.FC<LeftDockProps> = ({
   activeTab,
   onSelectTab,
   onOpenSearch,
+  isSidebarExpanded = true,
+  onToggleSidebar,
 }) => {
   const handleTab = (name: string) => {
     playClickSound();
@@ -20,11 +24,34 @@ export const LeftDock: React.FC<LeftDockProps> = ({
 
   return (
     <aside
-      className="hidden md:flex flex-col items-center justify-between py-5 px-3 border-r border-white/8 bg-[#101114] z-30 select-none shrink-0 h-full"
+      className="hidden md:flex flex-col items-center justify-between py-4 px-2.5 border-r border-white/8 bg-[#101114] z-30 select-none shrink-0 h-full"
       aria-label="Navigation rapide bibliothèque"
     >
-      <div className="flex flex-col items-center gap-5">
-        {/* Top Red Active Reading Badge */}
+      <div className="flex flex-col items-center gap-4">
+        {/* Toggle Sidebar Expand / Collapse Button */}
+        {onToggleSidebar && (
+          <button
+            onClick={() => {
+              playClickSound();
+              onToggleSidebar();
+            }}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+              !isSidebarExpanded
+                ? 'bg-red-600/20 text-red-400 border border-red-500/40 hover:bg-red-600/30 shadow-md shadow-red-950/50'
+                : 'text-zinc-400 hover:text-white hover:bg-white/10'
+            }`}
+            title={isSidebarExpanded ? 'Replier la barre latérale (Ctrl+B)' : 'Déplier la barre latérale (Ctrl+B)'}
+            aria-label={isSidebarExpanded ? 'Replier la barre latérale' : 'Déplier la barre latérale'}
+          >
+            {isSidebarExpanded ? (
+              <PanelLeftClose className="w-4 h-4" />
+            ) : (
+              <PanelLeftOpen className="w-4 h-4 text-red-400 animate-pulse" />
+            )}
+          </button>
+        )}
+
+        {/* Red Active Reading Badge */}
         <button
           onClick={() => handleTab('browse')}
           className={`w-9 h-9 rounded-full flex items-center justify-center transition-transform hover:scale-110 active:scale-95 cursor-pointer ${

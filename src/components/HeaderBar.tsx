@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Mic, Bell, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Mic, Bell, Maximize2, Minimize2, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
 import { playClickSound } from '../utils/audio.ts';
 
 interface HeaderBarProps {
@@ -7,6 +7,8 @@ interface HeaderBarProps {
   onSearchChange: (q: string) => void;
   onNotificationClick: () => void;
   unreadCount?: number;
+  isSidebarExpanded?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -14,6 +16,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onSearchChange,
   onNotificationClick,
   unreadCount = 2,
+  isSidebarExpanded = true,
+  onToggleSidebar,
 }) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -37,8 +41,29 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
   return (
     <header className="flex items-center justify-between gap-4 py-2 px-4 sm:px-6 border-b border-white/8 bg-[#121316]/95 backdrop-blur-md select-none shrink-0 z-20">
-      {/* Left Navigation Arrows */}
+      {/* Left Navigation: Sidebar Toggle + History Arrows */}
       <div className="flex items-center gap-2">
+        {onToggleSidebar && (
+          <button
+            onClick={() => {
+              playClickSound();
+              onToggleSidebar();
+            }}
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+              !isSidebarExpanded
+                ? 'bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-600/30'
+                : 'text-zinc-400 hover:text-white hover:bg-white/10'
+            }`}
+            title={isSidebarExpanded ? 'Replier le menu (Ctrl+B)' : 'Déplier le menu (Ctrl+B)'}
+            aria-label={isSidebarExpanded ? 'Replier la barre latérale' : 'Déplier la barre latérale'}
+          >
+            {isSidebarExpanded ? (
+              <PanelLeftClose className="w-4 h-4" />
+            ) : (
+              <PanelLeftOpen className="w-4 h-4 text-red-400 animate-pulse" />
+            )}
+          </button>
+        )}
         <button
           onClick={playClickSound}
           className="text-zinc-500 hover:text-zinc-300 transition-colors p-1.5 rounded-full hover:bg-white/5 cursor-pointer"

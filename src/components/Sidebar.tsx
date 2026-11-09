@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Sparkles, BookOpen, Layers } from 'lucide-react';
+import { Heart, Sparkles, BookOpen, Layers, PanelLeftClose } from 'lucide-react';
 import { BookItem } from '../data/booksData.ts';
 import { playClickSound, playNetflixTaDum } from '../utils/audio.ts';
 
@@ -10,6 +10,7 @@ interface SidebarProps {
   onOpenReader: (item: BookItem) => void;
   wishlistCount: number;
   totalBooksCount?: number;
+  onToggleCollapse?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -19,12 +20,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenReader,
   wishlistCount,
   totalBooksCount = 200,
+  onToggleCollapse,
 }) => {
   return (
-    <aside className="w-52 lg:w-56 shrink-0 flex flex-col justify-between py-1 pr-3 border-r border-white/8 select-none">
+    <aside className="w-52 lg:w-56 shrink-0 flex flex-col justify-between py-1 pr-3 select-none">
       <div>
-        {/* Brand Logo: NETFLIX BOOKS */}
-        <div className="mb-5 flex items-center gap-2">
+        {/* Brand Logo & Collapse Button */}
+        <div className="mb-5 flex items-center justify-between gap-2">
           <div
             onClick={() => {
               playNetflixTaDum();
@@ -42,6 +44,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
               BOOKS
             </span>
           </div>
+
+          {onToggleCollapse && (
+            <button
+              onClick={() => {
+                playClickSound();
+                onToggleCollapse();
+              }}
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              title="Replier la barre latérale (Ctrl+B)"
+              aria-label="Replier la barre latérale"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Navigation Links */}
